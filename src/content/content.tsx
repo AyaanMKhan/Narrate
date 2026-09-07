@@ -5,6 +5,7 @@ import styles from './content.css?inline';
 import { api } from '@/shared/messaging';
 import { SelectionBubble, type AnchorRect } from './SelectionBubble';
 import { MiniPlayer } from './MiniPlayer';
+import { DrivePdfButton } from './DrivePdfButton';
 import { useNarrateState } from './useNarrateState';
 import * as highlighter from './highlighter';
 import { chunkText } from '@/shared/chunk';
@@ -279,6 +280,7 @@ function ContentApp({ host }: ContentAppProps) {
         />
       ) : null}
       {showPlayer ? <MiniPlayer state={state} rate={rate} onRateChange={handleRate} /> : null}
+      <DrivePdfButton />
     </>
   );
 }

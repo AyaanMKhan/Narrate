@@ -228,6 +228,17 @@ function viewerUrlFor(url?: string): string {
   return url ? `${VIEWER_URL}?file=${encodeURIComponent(url)}` : VIEWER_URL;
 }
 
+/* A Drive preview page fetches its own PDF bytes (see DrivePdfButton — it
+   needs the page's own cookies, which a background fetch can never have) and
+   hands them here. We hold them just long enough for the viewer tab we open
+   to collect them once; nothing is ever written to disk. */
+const DRIVE_HANDOFF_TTL_MS = 60_000;
+const pendingDrivePdfs = new Map<string, { name: string; buffer: ArrayBuffer }>();
+
+function driveViewerUrlFor(id: string): string {
+  return `${VIEWER_URL}?drive=${id}`;
+}
+
 /** Open the reader, reusing a tab already showing the same document. */
 async function openViewer(url?: string): Promise<boolean> {
   const target = viewerUrlFor(url);
@@ -438,6 +449,26 @@ async function handleUi(message: UiMessage, sender: chrome.runtime.MessageSender
       } catch {
         return false;
       }
+
+    case 'OPEN_DRIVE_PDF': {
+      const id = crypto.randomUUID();
+      pendingDrivePdfs.set(id, { name: message.name, buffer: message.buffer });
+      setTimeout(() => pendingDrivePdfs.delete(id), DRIVE_HANDOFF_TTL_MS);
+      try {
+        await chrome.tabs.create({ url: driveViewerUrlFor(id) });
+        return true;
+      } catch {
+        pendingDrivePdfs.delete(id);
+        return false;
+      }
+    }
+
+    case 'GET_DRIVE_PDF': {
+      // One-shot: the viewer is the only consumer, and only ever asks once.
+      const entry = pendingDrivePdfs.get(message.id) ?? null;
+      pendingDrivePdfs.delete(message.id);
+      return entry;
+    }
 
     default:
       return state;

@@ -396,11 +396,29 @@ export default function Viewer() {
     [openSource],
   );
 
-  /* The background redirects PDFs here as ?file=<encoded url>. */
+  /* The background redirects PDFs here as ?file=<encoded url>, or as
+     ?drive=<handoff id> when a Drive preview page fetched the bytes itself
+     (see DrivePdfButton) and is waiting for us to collect them. */
   useEffect(() => {
-    const target = new URLSearchParams(window.location.search).get('file');
+    const params = new URLSearchParams(window.location.search);
+    const driveId = params.get('drive');
+    if (driveId) {
+      setPhase('loading');
+      void api.getDrivePdf(driveId).then((entry) => {
+        if (entry) void openSource(entry.buffer, entry.name);
+        else {
+          setPhase('error');
+          setLoadError({
+            message: 'This Drive handoff expired — open the file in Drive again and retry.',
+            needsFileAccess: false,
+          });
+        }
+      });
+      return;
+    }
+    const target = params.get('file');
     if (target) void openUrl(target);
-  }, [openUrl]);
+  }, [openUrl, openSource]);
 
   useEffect(() => {
     document.title = fileName ? `${fileName} — ${BRAND.name}` : `${BRAND.name} — PDF Reader`;

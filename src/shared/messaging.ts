@@ -35,4 +35,8 @@ export const api = {
   speakPage: () => send({ type: 'SPEAK_PAGE' }),
   openPdfViewer: (url?: string) => send({ type: 'OPEN_PDF_VIEWER', url }),
   getFileAccess: () => send<boolean>({ type: 'GET_FILE_ACCESS' }),
+  openDrivePdf: (name: string, buffer: ArrayBuffer) =>
+    send<boolean>({ type: 'OPEN_DRIVE_PDF', name, buffer }),
+  getDrivePdf: (id: string) =>
+    send<{ name: string; buffer: ArrayBuffer } | null>({ type: 'GET_DRIVE_PDF', id }),
 };

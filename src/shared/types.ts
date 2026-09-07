@@ -120,7 +120,16 @@ export type UiMessage =
   /** Open Narrate's PDF reader, optionally on a specific document. */
   | { type: 'OPEN_PDF_VIEWER'; url?: string }
   /** Whether the user has granted "Allow access to file URLs". */
-  | { type: 'GET_FILE_ACCESS' };
+  | { type: 'GET_FILE_ACCESS' }
+  /**
+   * A content script fetched a PDF's bytes itself (e.g. from a Google Drive
+   * preview page, using that page's own session cookies) and wants them
+   * opened in Narrate's reader. The background just relays the bytes to a
+   * fresh viewer tab — it never touches the network for this.
+   */
+  | { type: 'OPEN_DRIVE_PDF'; name: string; buffer: ArrayBuffer }
+  /** The viewer asking for the bytes an OPEN_DRIVE_PDF handoff left waiting. */
+  | { type: 'GET_DRIVE_PDF'; id: string };
 
 /** Background -> offscreen audio document. */
 export type OffscreenCommand =

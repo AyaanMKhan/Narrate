@@ -50,6 +50,10 @@ Options 1 and 2 work without setup. For option 3 to work on **local** files (`fi
 
 The popup detects whether this is granted and shows a reminder if it isn't. Your PDF is parsed locally by PDF.js; nothing is uploaded.
 
+### PDFs previewed in Google Drive
+
+Drive's own preview (`drive.google.com/file/d/…/view`) renders pages as canvas/image tiles, not real text — same dead end as Chrome's viewer, so scraping it isn't an option. Instead, a **"🔊 Narrate this PDF"** button appears (bottom-left) on any Drive file-preview page. Clicking it fetches the file's actual bytes — from inside that Drive tab, so the request carries the tab's own session cookies — and opens them in Narrate's reader. This covers public/"anyone with the link" files and any private file you can already view while signed in. Files the owner has restricted from download/copy/print stay blocked by Drive itself; no client-side workaround gets around that, so Narrate won't try. There's no way to tell a PDF from any other file type by URL alone, so the button shows up on every Drive preview — if the fetched bytes don't start with `%PDF-`, it reports "Couldn't open this file" instead of guessing.
+
 ## Install (unpacked)
 
 ```bash
@@ -87,6 +91,7 @@ src/
   content/      content.tsx         — Shadow DOM mount, selection tracking
                 SelectionBubble.tsx — the highlight-to-narrate pill
                 MiniPlayer.tsx      — floating transport controls
+                DrivePdfButton.tsx  — fetches + opens PDFs previewed in Google Drive
   popup/        Popup.tsx + components/ — toolbar panel and settings
   viewer/       Viewer.tsx, pdf.ts  — PDF.js reader (Chrome's own viewer hides its text)
   ui/           tokens.css          — the single source of colour, radius and shadow

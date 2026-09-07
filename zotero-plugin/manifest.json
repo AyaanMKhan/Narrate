@@ -1,0 +1,15 @@
+{
+	"manifest_version": 2,
+	"name": "Narrate for Zotero",
+	"version": "0.1.0",
+	"description": "Read selected text aloud in Zotero's PDF reader, using your system's text-to-speech voices.",
+	"homepage_url": "https://github.com/ayaankhan/Narrate",
+	"author": "Narrate",
+	"applications": {
+		"zotero": {
+			"id": "narrate@narrate-app.dev",
+			"strict_min_version": "7.0",
+			"strict_max_version": "7.*"
+		}
+	}
+}

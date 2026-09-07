@@ -485,3 +485,43 @@
 .n-retry:hover {
   background: var(--n-accent-hover);
 }
+
+/* ------------------------------------------------------------------ */
+/* Drive PDF button (shown only on a Drive file-preview page)          */
+/* ------------------------------------------------------------------ */
+
+.n-drive-btn {
+  position: fixed;
+  z-index: 2;
+  left: 20px;
+  bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--n-border);
+  border-radius: var(--n-radius-pill);
+  background: var(--n-surface);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  box-shadow: var(--n-shadow-lg);
+  color: var(--n-text);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: auto;
+  transition: background var(--n-dur) var(--n-ease), color var(--n-dur) var(--n-ease);
+}
+
+.n-drive-btn:hover:not(:disabled) {
+  background: var(--n-accent-soft);
+  color: var(--n-accent);
+}
+
+.n-drive-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.n-drive-btn[data-status='error'] {
+  color: var(--n-danger);
+}
