@@ -749,7 +749,7 @@ export default function Viewer() {
   /* ---------------------------------------------------------------- */
 
   const pages = useMemo(
-    () => Array.from({ length: pageCount }, (unused, index) => index + 1),
+    () => Array.from({ length: pageCount }, (_, index) => index + 1),
     [pageCount],
   );
 

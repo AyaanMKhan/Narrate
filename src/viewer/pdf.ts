@@ -59,9 +59,9 @@ export async function loadDocument(source: ArrayBuffer | string): Promise<PDFDoc
     cMapPacked: true,
     standardFontDataUrl: chrome.runtime.getURL(PDF_STANDARD_FONTS_PATH),
     wasmUrl: chrome.runtime.getURL(PDF_WASM_PATH),
-    // Extension pages have no 'unsafe-eval': without this PDF.js throws while
-    // compiling its font/expression helpers and nothing renders at all.
-    isEvalSupported: false,
+    // No isEvalSupported here on purpose: v6 dropped the flag along with the
+    // last eval()/new Function() call sites, so PDF.js already satisfies MV3's
+    // CSP. Passing it would be silently ignored and rejected by the typings.
   });
   return task.promise;
 }
