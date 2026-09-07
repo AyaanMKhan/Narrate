@@ -1,0 +1,84 @@
+/* Narrate design tokens — shared by the popup and the in-page UI.
+   Every surface reads from these; never hard-code a colour elsewhere. */
+:root,
+:host {
+  --n-bg: #ffffff;
+  --n-bg-sunken: #f5f6f8;
+  --n-surface: rgba(255, 255, 255, 0.86);
+  --n-surface-solid: #ffffff;
+  --n-border: rgba(16, 18, 27, 0.10);
+  --n-border-strong: rgba(16, 18, 27, 0.18);
+
+  --n-text: #16181f;
+  --n-text-soft: #5b6070;
+  --n-text-faint: #8a90a2;
+
+  --n-accent: #6d5efc;
+  --n-accent-hover: #5a49f5;
+  --n-accent-soft: rgba(109, 94, 252, 0.12);
+  --n-accent-text: #ffffff;
+  --n-highlight: rgba(109, 94, 252, 0.22);
+
+  --n-danger: #e5484d;
+  --n-ok: #30a46c;
+
+  --n-radius-sm: 8px;
+  --n-radius: 12px;
+  --n-radius-lg: 16px;
+  --n-radius-pill: 999px;
+
+  --n-shadow-sm: 0 1px 2px rgba(16, 18, 27, 0.06), 0 1px 3px rgba(16, 18, 27, 0.05);
+  --n-shadow: 0 4px 12px rgba(16, 18, 27, 0.10), 0 1px 3px rgba(16, 18, 27, 0.06);
+  --n-shadow-lg: 0 12px 32px rgba(16, 18, 27, 0.16), 0 2px 8px rgba(16, 18, 27, 0.08);
+
+  --n-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, 'Helvetica Neue', sans-serif;
+  --n-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --n-dur: 180ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']),
+  :host(:not([data-theme='light'])) {
+    --n-bg: #131419;
+    --n-bg-sunken: #0e0f13;
+    --n-surface: rgba(28, 30, 38, 0.88);
+    --n-surface-solid: #1c1e26;
+    --n-border: rgba(255, 255, 255, 0.10);
+    --n-border-strong: rgba(255, 255, 255, 0.18);
+
+    --n-text: #eceef4;
+    --n-text-soft: #a2a8ba;
+    --n-text-faint: #71778a;
+
+    --n-accent: #8b7bff;
+    --n-accent-hover: #9d90ff;
+    --n-accent-soft: rgba(139, 123, 255, 0.18);
+    --n-accent-text: #12111c;
+    --n-highlight: rgba(139, 123, 255, 0.30);
+
+    --n-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --n-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    --n-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+[data-theme='dark'] {
+  --n-bg: #131419;
+  --n-bg-sunken: #0e0f13;
+  --n-surface: rgba(28, 30, 38, 0.88);
+  --n-surface-solid: #1c1e26;
+  --n-border: rgba(255, 255, 255, 0.10);
+  --n-border-strong: rgba(255, 255, 255, 0.18);
+  --n-text: #eceef4;
+  --n-text-soft: #a2a8ba;
+  --n-text-faint: #71778a;
+  --n-accent: #8b7bff;
+  --n-accent-hover: #9d90ff;
+  --n-accent-soft: rgba(139, 123, 255, 0.18);
+  --n-accent-text: #12111c;
+  --n-highlight: rgba(139, 123, 255, 0.30);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root, :host { --n-dur: 0ms; }
+}
