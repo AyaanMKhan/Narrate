@@ -175,6 +175,7 @@ async function startSpeak(text: string, title: string | undefined, tabId: number
     tabId,
   };
   broadcastState();
+  await ensureTabVisible(tabId);
   await toOffscreen({ type: 'OFF_SPEAK', chunks: next, settings });
   return state;
 }
@@ -287,6 +288,27 @@ async function activeTab(): Promise<chrome.tabs.Tab | null> {
   }
 }
 
+/** Bring the reading tab and its window forward so the live highlight is visible. */
+async function ensureTabVisible(tabId: number | null): Promise<void> {
+  if (tabId === null) return;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab.active) await chrome.tabs.update(tabId, { active: true });
+    if (tab.windowId !== undefined) {
+      const win = await chrome.windows.get(tab.windowId);
+      if (win.state === 'minimized' || !win.focused) {
+        // Only force state on a minimized window — leave a normal/maximized one as-is.
+        await chrome.windows.update(tab.windowId, {
+          focused: true,
+          ...(win.state === 'minimized' ? { state: 'normal' as chrome.windows.windowStateEnum } : {}),
+        });
+      }
+    }
+  } catch {
+    /* tab/window vanished between the check and the call */
+  }
+}
+
 /** Injected into the page — must be self-contained. */
 function extractReadableText(): string {
   const node: HTMLElement =
@@ -363,6 +385,7 @@ async function handleUi(message: UiMessage, sender: chrome.runtime.MessageSender
       return state;
 
     case 'RESUME':
+      await ensureTabVisible(state.tabId);
       await toOffscreen({ type: 'OFF_RESUME' });
       return state;
 

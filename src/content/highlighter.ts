@@ -16,6 +16,7 @@ interface Anchor {
 }
 
 let anchors: Anchor[] = [];
+let lastRange: Range | null = null;
 
 export function isSupported(): boolean {
   return typeof Highlight !== 'undefined' && typeof CSS !== 'undefined' && !!CSS.highlights;
@@ -77,9 +78,27 @@ export function paint(start: number, end: number): void {
     range.setStart(first.node, first.offset);
     range.setEnd(last.node, Math.min(last.offset + 1, last.node.data.length));
     CSS.highlights.set(HIGHLIGHT_NAME, new Highlight(range));
+    lastRange = range;
   } catch {
     // Nodes can be replaced by the page (SPA re-render) between chunks.
     clear();
+  }
+}
+
+/** Scroll the last painted range into view if it's clipped by the viewport. */
+export function ensureVisible(): void {
+  if (!lastRange || !isSupported()) return;
+
+  const rect = lastRange.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return;
+  if (rect.top >= 0 && rect.bottom <= window.innerHeight) return;
+
+  try {
+    const container = lastRange.startContainer;
+    const el = container.nodeType === Node.TEXT_NODE ? container.parentElement : (container as Element);
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  } catch {
+    // Nodes can be replaced by the page (SPA re-render) between chunks.
   }
 }
 
@@ -90,6 +109,7 @@ export function clear(): void {
   } catch {
     /* registry already gone */
   }
+  lastRange = null;
 }
 
 export function reset(): void {

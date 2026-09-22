@@ -254,7 +254,10 @@ function ContentApp({ host }: ContentAppProps) {
       return;
     }
     const chunk = chunksRef.current[state.chunkIndex];
-    if (chunk) highlighter.paint(chunk.start, chunk.end);
+    if (chunk) {
+      highlighter.paint(chunk.start, chunk.end);
+      highlighter.ensureVisible();
+    }
   }, [settings.highlightSpoken, state.status, state.chunkIndex]);
 
   /* Drop the highlight (and its anchors) once narration is over. */
