@@ -41,6 +41,19 @@ export interface PlaybackState {
   modelProgress: number | null;
   /** Tab that owns the current playback, if any. */
   tabId: number | null;
+  /**
+   * Caller-chosen id of the text being read, so the surface that sent it can
+   * find its own DOM range again when a queued item starts.
+   */
+  itemId: string | null;
+  /** Texts waiting to be read once the current one finishes, in order. */
+  queue: QueuedItem[];
+}
+
+/** A text waiting its turn — the full text stays in the background. */
+export interface QueuedItem {
+  id: string;
+  title: string;
 }
 
 export interface VoiceOption {
@@ -96,6 +109,8 @@ export const INITIAL_STATE: PlaybackState = {
   error: null,
   modelProgress: null,
   tabId: null,
+  itemId: null,
+  queue: [],
 };
 
 /* ------------------------------------------------------------------ */
@@ -104,7 +119,11 @@ export const INITIAL_STATE: PlaybackState = {
 
 /** UI (content script / popup) -> background service worker. */
 export type UiMessage =
-  | { type: 'SPEAK'; text: string; title?: string }
+  | { type: 'SPEAK'; text: string; title?: string; id?: string }
+  /** Read this after the current text (and anything already queued) finishes. */
+  | { type: 'ENQUEUE'; text: string; title?: string; id?: string }
+  | { type: 'UNQUEUE'; id: string }
+  | { type: 'CLEAR_QUEUE' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'STOP' }

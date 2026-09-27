@@ -384,6 +384,48 @@
   font-variant-numeric: tabular-nums;
 }
 
+.n-mini__queue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 10px 8px;
+  padding: 5px 4px 5px 9px;
+  border-radius: var(--n-radius-pill);
+  background: var(--n-bg-sunken);
+  font-size: 11px;
+  color: var(--n-text-soft);
+}
+
+.n-mini__queue-label {
+  flex: none;
+  font-weight: 600;
+  color: var(--n-accent);
+}
+
+.n-mini__queue-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.n-mini__queue-more {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--n-text-faint);
+}
+
+.n-icon--tiny {
+  width: 20px;
+  height: 20px;
+}
+
+.n-icon--tiny svg {
+  width: 12px;
+  height: 12px;
+}
+
 .n-mini__error {
   overflow: hidden;
   color: var(--n-danger);

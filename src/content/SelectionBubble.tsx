@@ -132,6 +132,11 @@ export interface SelectionBubbleProps {
   onRateChange: (rate: number) => void;
   onPlay: () => void;
   onDismiss: () => void;
+  /**
+   * Set while something is already being read: the bubble then offers to
+   * queue the selection after it, with "play now" as the secondary action.
+   */
+  onQueue?: () => void;
 }
 
 interface Placement {
@@ -146,6 +151,7 @@ export function SelectionBubble({
   onRateChange,
   onPlay,
   onDismiss,
+  onQueue,
 }: SelectionBubbleProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [placement, setPlacement] = useState<Placement | null>(null);
@@ -167,7 +173,7 @@ export function SelectionBubble({
     const top = fitsAbove ? above : Math.min(below, Math.max(MARGIN, vh - height - MARGIN));
 
     setPlacement({ left: Math.round(left), top: Math.round(top), side });
-  }, [anchor.top, anchor.bottom, anchor.left, anchor.right]);
+  }, [anchor.top, anchor.bottom, anchor.left, anchor.right, !!onQueue]);
 
   return (
     <div
@@ -182,19 +188,38 @@ export function SelectionBubble({
         if (event.key === 'Escape') onDismiss();
       }}
     >
-      <button type="button" className="n-bubble__play" onClick={onPlay} aria-label="Narrate selection">
-        <svg viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M4.4 2.6a.7.7 0 0 1 1.06-.6l5.4 4.4a.7.7 0 0 1 0 1.2l-5.4 4.4a.7.7 0 0 1-1.06-.6z" fill="currentColor" />
-        </svg>
-      </button>
+      {onQueue ? (
+        <>
+          <button type="button" className="n-bubble__play" onClick={onQueue} aria-label="Add selection to the queue">
+            <svg viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M2 3.5h7M2 7h7M2 10.5h4.5M10.5 8.5v4M8.5 10.5h4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button type="button" className="n-bubble__label" onClick={onQueue}>
+            Add to queue
+          </button>
+          <span className="n-bubble__divider" aria-hidden="true" />
+          <button type="button" className="n-chip n-chip--ghost" onClick={onPlay}>
+            Play now
+          </button>
+        </>
+      ) : (
+        <>
+          <button type="button" className="n-bubble__play" onClick={onPlay} aria-label="Narrate selection">
+            <svg viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M4.4 2.6a.7.7 0 0 1 1.06-.6l5.4 4.4a.7.7 0 0 1 0 1.2l-5.4 4.4a.7.7 0 0 1-1.06-.6z" fill="currentColor" />
+            </svg>
+          </button>
 
-      <button type="button" className="n-bubble__label" onClick={onPlay}>
-        {BRAND.name}
-      </button>
+          <button type="button" className="n-bubble__label" onClick={onPlay}>
+            {BRAND.name}
+          </button>
 
-      <span className="n-bubble__divider" aria-hidden="true" />
+          <span className="n-bubble__divider" aria-hidden="true" />
 
-      <SpeedControl rate={rate} onChange={onRateChange} placement="down" tone="ghost" />
+          <SpeedControl rate={rate} onChange={onRateChange} placement="down" tone="ghost" />
+        </>
+      )}
     </div>
   );
 }

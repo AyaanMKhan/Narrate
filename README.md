@@ -9,6 +9,7 @@ Highlight any text on any page and hear it read aloud. Built with React + TypeSc
 ## Features
 
 - **Highlight to narrate** — select text anywhere and a floating bubble offers to read it.
+- **Queue what's next** — while something is playing, highlight another passage and hit *Add to queue*; it's read as soon as the current one finishes (works in the PDF reader too).
 - **Speeds from 0.5× to 3×** — `0.5 · 0.75 · 1 · 1.25 · 1.5 · 1.75 · 2 · 2.5 · 3`, changeable mid-playback.
 - **Two free engines** — instant system voices, or a neural AI voice that runs on-device.
 - **Read the whole page** — one click in the popup extracts the article text and reads it.

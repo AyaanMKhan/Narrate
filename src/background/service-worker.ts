@@ -28,6 +28,8 @@ let settings: Settings = { ...DEFAULT_SETTINGS };
 let chunks: Chunk[] = [];
 /** Chunk.index of the first chunk the offscreen queue currently holds. */
 let queueOffset = 0;
+/** Texts lined up behind the current one; state.queue mirrors their ids/titles. */
+let pending: { id: string; text: string; title: string | undefined; tabId: number | null }[] = [];
 let voiceCache: VoiceOption[] = [];
 
 const settingsReady: Promise<void> = loadSettings()
@@ -157,9 +159,25 @@ function preview(text: string): string {
   return flat.length > 60 ? `${flat.slice(0, 57)}…` : flat;
 }
 
-async function startSpeak(text: string, title: string | undefined, tabId: number | null): Promise<PlaybackState> {
+function queueSnapshot(): PlaybackState['queue'] {
+  return pending.map(({ id, text }) => ({ id, title: preview(text) }));
+}
+
+async function startSpeak(
+  text: string,
+  title: string | undefined,
+  tabId: number | null,
+  id: string | null = null,
+  focusTab = true,
+): Promise<PlaybackState> {
   const next = chunkText(text);
   if (!next.length) return state;
+
+  // Playback is moving to another tab — let the old one drop its player.
+  if (state.tabId !== null && state.tabId !== tabId) {
+    const released: BroadcastMessage = { type: 'STATE', state: { ...INITIAL_STATE } };
+    quiet(chrome.tabs.sendMessage(state.tabId, released));
+  }
 
   chunks = next;
   queueOffset = 0;
@@ -173,10 +191,38 @@ async function startSpeak(text: string, title: string | undefined, tabId: number
     rate: settings.rate,
     voiceId: voiceIdFor(settings),
     tabId,
+    itemId: id,
+    queue: queueSnapshot(),
   };
   broadcastState();
-  await ensureTabVisible(tabId);
+  if (focusTab) await ensureTabVisible(tabId);
   await toOffscreen({ type: 'OFF_SPEAK', chunks: next, settings });
+  return state;
+}
+
+/** Start the next queued text, in the tab that queued it. */
+async function playNext(): Promise<PlaybackState> {
+  const next = pending.shift();
+  if (!next) return state;
+  // Moving on by itself shouldn't yank focus back to the reading tab.
+  return startSpeak(next.text, next.title, next.tabId, next.id, false);
+}
+
+async function enqueue(
+  text: string,
+  title: string | undefined,
+  id: string | undefined,
+  tabId: number | null,
+): Promise<PlaybackState> {
+  const itemId = id ?? crypto.randomUUID();
+  // Nothing playing to wait behind — just start.
+  if (state.status === 'idle' || state.status === 'error') {
+    return startSpeak(text, title, tabId, itemId);
+  }
+  if (!chunkText(text).length) return state;
+  pending.push({ id: itemId, text, title, tabId });
+  state = { ...state, queue: queueSnapshot() };
+  broadcastState();
   return state;
 }
 
@@ -184,7 +230,17 @@ async function stopPlayback(): Promise<PlaybackState> {
   if (await hasOffscreen()) await toOffscreen({ type: 'OFF_STOP' });
   chunks = [];
   queueOffset = 0;
-  state = { ...state, status: 'idle', chunkIndex: 0, progress: 0, error: null, modelProgress: null };
+  pending = [];
+  state = {
+    ...state,
+    status: 'idle',
+    chunkIndex: 0,
+    progress: 0,
+    error: null,
+    modelProgress: null,
+    itemId: null,
+    queue: [],
+  };
   broadcastState();
   return state;
 }
@@ -377,8 +433,25 @@ async function handleUi(message: UiMessage, sender: chrome.runtime.MessageSender
   switch (message.type) {
     case 'SPEAK': {
       const tabId = sender.tab?.id ?? (await activeTab())?.id ?? null;
-      return startSpeak(message.text, message.title, tabId);
+      return startSpeak(message.text, message.title, tabId, message.id ?? null);
     }
+
+    case 'ENQUEUE': {
+      const tabId = sender.tab?.id ?? (await activeTab())?.id ?? null;
+      return enqueue(message.text, message.title, message.id, tabId);
+    }
+
+    case 'UNQUEUE':
+      pending = pending.filter((item) => item.id !== message.id);
+      state = { ...state, queue: queueSnapshot() };
+      broadcastState();
+      return state;
+
+    case 'CLEAR_QUEUE':
+      pending = [];
+      state = { ...state, queue: [] };
+      broadcastState();
+      return state;
 
     case 'PAUSE':
       await toOffscreen({ type: 'OFF_PAUSE' });
@@ -394,6 +467,10 @@ async function handleUi(message: UiMessage, sender: chrome.runtime.MessageSender
 
     case 'SKIP': {
       if (!state.chunkCount) return state;
+      // Skipping past the last sentence moves on to whatever is queued.
+      if (message.delta > 0 && state.chunkIndex + message.delta >= state.chunkCount && pending.length) {
+        return playNext();
+      }
       const target = clamp(state.chunkIndex + message.delta, 0, state.chunkCount - 1);
       // A restart may have trimmed the offscreen queue — reload it before seeking back.
       if (target < queueOffset) {
@@ -526,6 +603,12 @@ function handleOffscreenEvent(event: OffscreenEvent): void {
       break;
 
     case 'OFF_DONE':
+      if (pending.length) {
+        // Go straight to loading the next text — never flash through idle,
+        // which would make the page drop the ranges it kept for the queue.
+        void playNext();
+        return;
+      }
       chunks = [];
       state = { ...state, status: 'idle', progress: 1, modelProgress: null };
       break;
@@ -638,7 +721,15 @@ chrome.commands.onCommand.addListener((command) => {
 /* ------------------------------------------------------------------ */
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  if (state.tabId === tabId && state.status !== 'idle') void stopPlayback();
+  if (state.tabId === tabId && state.status !== 'idle') {
+    void stopPlayback();
+    return;
+  }
+  if (pending.some((item) => item.tabId === tabId)) {
+    pending = pending.filter((item) => item.tabId !== tabId);
+    state = { ...state, queue: queueSnapshot() };
+    broadcastState();
+  }
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { BRAND } from '@/shared/constants';
 import { chunkText } from '@/shared/chunk';
-import { api } from '@/shared/messaging';
+import { api, newItemId } from '@/shared/messaging';
 import type { Chunk } from '@/shared/types';
 import * as highlighter from '@/content/highlighter';
 import { useNarrateState } from '@/content/useNarrateState';
@@ -50,7 +50,7 @@ interface LoadError {
  * the starting page have length 0.
  */
 type Narration =
-  | { kind: 'selection'; chunks: Chunk[] }
+  | { kind: 'selection'; chunks: Chunk[]; range: Range }
   | { kind: 'pages'; chunks: Chunk[]; offsets: number[]; lengths: number[] };
 
 /* ------------------------------------------------------------------ */
@@ -128,6 +128,20 @@ function Mark({ className = 'n-mark' }: { className?: string }) {
         <path d="M14.1 6.6v6.8" />
         <path d="M17.6 9v2" />
       </g>
+    </svg>
+  );
+}
+
+function IconQueue() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M2.5 4h8M2.5 8h8M2.5 12h5M12.5 9.5v5M10 12h5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -312,6 +326,8 @@ export default function Viewer() {
   const pageTextsRef = useRef<string[]>([]);
   const extractingRef = useRef<Promise<string[]> | null>(null);
   const narrationRef = useRef<Narration | null>(null);
+  /** Every text we've sent (playing or queued), by item id. */
+  const narrationsRef = useRef(new Map<string, Narration>());
   const capturedRef = useRef<number | null>(null);
 
   const active =
@@ -612,31 +628,53 @@ export default function Viewer() {
         return;
       }
 
-      highlighter.reset();
-      capturedRef.current = null;
-      narrationRef.current = { kind: 'pages', chunks: chunkText(text), offsets, lengths };
+      const id = newItemId();
+      narrationsRef.current.set(id, { kind: 'pages', chunks: chunkText(text), offsets, lengths });
       setNotice(null);
-      setSpokenPage(from);
-      void api.speak(text, fileName);
+      void api.speak(text, fileName, id);
     },
     [doc, ensureText, fileName],
   );
 
-  const narrateSelection = useCallback(() => {
-    const selection = document.getSelection();
-    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
-    const text = selection.toString().trim();
-    if (text.length < MIN_SELECTION_CHARS) return;
+  /** Send the current selection to be read now, or after everything queued. */
+  const narrateSelection = useCallback(
+    (mode: 'now' | 'queue') => {
+      const selection = document.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+      const text = selection.toString().trim();
+      if (text.length < MIN_SELECTION_CHARS) return;
 
-    const range = selection.getRangeAt(0).cloneRange();
+      const id = newItemId();
+      const range = selection.getRangeAt(0).cloneRange();
+      narrationsRef.current.set(id, { kind: 'selection', chunks: chunkText(text), range });
+      setNotice(null);
+      if (mode === 'queue') {
+        selection.removeAllRanges();
+        void api.enqueue(text, fileName, id);
+      } else {
+        void api.speak(text, fileName, id);
+      }
+    },
+    [fileName],
+  );
+
+  /* Switch highlighting over to whichever of our texts is now being read. */
+  useEffect(() => {
+    const narration = state.itemId ? narrationsRef.current.get(state.itemId) ?? null : null;
     highlighter.reset();
-    narrationRef.current = { kind: 'selection', chunks: chunkText(text) };
-    highlighter.capture(range);
     capturedRef.current = null;
-    setNotice(null);
-    setSpokenPage(null);
-    void api.speak(text, fileName);
-  }, [fileName]);
+    narrationRef.current = narration;
+    if (narration?.kind === 'selection') {
+      highlighter.capture(narration.range);
+      setSpokenPage(null);
+    }
+    // Forget texts that are neither playing nor waiting.
+    const keep = new Set(state.queue.map((q) => q.id));
+    if (state.itemId) keep.add(state.itemId);
+    for (const id of narrationsRef.current.keys()) {
+      if (!keep.has(id)) narrationsRef.current.delete(id);
+    }
+  }, [state.itemId]);
 
   /* Track the selection ourselves — content scripts don't run on our pages. */
   useEffect(() => {
@@ -699,7 +737,7 @@ export default function Viewer() {
     if (rect.top < TOOLBAR_CLEARANCE || rect.bottom > window.innerHeight) {
       span.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-  }, [state.chunkIndex, state.status, settings.highlightSpoken, active, renderNonce]);
+  }, [state.chunkIndex, state.status, state.itemId, settings.highlightSpoken, active, renderNonce]);
 
   useEffect(() => {
     if (state.status !== 'idle') return;
@@ -963,6 +1001,16 @@ export default function Viewer() {
                 <IconStop />
               </button>
               {chunkLabel ? <span className="n-counter">{chunkLabel}</span> : null}
+              {state.queue.length ? (
+                <button
+                  type="button"
+                  className="n-counter n-counter--queue"
+                  title={`Up next: ${state.queue[0].title} — click to clear the queue`}
+                  onClick={() => void api.clearQueue()}
+                >
+                  +{state.queue.length} queued
+                </button>
+              ) : null}
             </div>
           ) : (
             <button
@@ -1022,10 +1070,26 @@ export default function Viewer() {
       </main>
 
       {selectionCount >= MIN_SELECTION_CHARS ? (
-        <button type="button" className="n-selection-btn" onClick={narrateSelection}>
-          <IconPlay />
-          Narrate selection
-        </button>
+        active ? (
+          <div className="n-selection-group">
+            <button
+              type="button"
+              className="n-selection-btn n-selection-btn--quiet"
+              onClick={() => narrateSelection('now')}
+            >
+              Play now
+            </button>
+            <button type="button" className="n-selection-btn" onClick={() => narrateSelection('queue')}>
+              <IconQueue />
+              Add to queue
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="n-selection-btn" onClick={() => narrateSelection('now')}>
+            <IconPlay />
+            Narrate selection
+          </button>
+        )
       ) : null}
     </div>
   );

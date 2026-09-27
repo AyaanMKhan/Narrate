@@ -85,6 +85,7 @@ export function MiniPlayer({ state, rate, onRateChange }: MiniPlayerProps) {
   const isPlaying = state.status === 'playing';
   const isError = state.status === 'error';
   const hasChunks = state.chunkCount > 0;
+  const upNext = state.queue[0];
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const el = ref.current;
@@ -234,7 +235,9 @@ export function MiniPlayer({ state, rate, onRateChange }: MiniPlayerProps) {
             <button
               type="button"
               className="n-icon"
-              aria-label="Next sentence"
+              aria-label={
+                upNext && state.chunkIndex >= state.chunkCount - 1 ? 'Skip to next in queue' : 'Next sentence'
+              }
               disabled={!hasChunks}
               onClick={() => void api.skip(1)}
             >
@@ -246,6 +249,27 @@ export function MiniPlayer({ state, rate, onRateChange }: MiniPlayerProps) {
         <div className="n-mini__spacer" />
         <SpeedControl rate={rate} onChange={onRateChange} placement="up" tone="sunken" />
       </div>
+
+      {upNext ? (
+        <div className="n-mini__queue" aria-label="Queue">
+          <span className="n-mini__queue-label">Up next</span>
+          <span className="n-mini__queue-title" title={upNext.title}>
+            {upNext.title}
+          </span>
+          {state.queue.length > 1 ? (
+            <span className="n-mini__queue-more">+{state.queue.length - 1}</span>
+          ) : null}
+          <button
+            type="button"
+            className="n-icon n-icon--quiet n-icon--tiny"
+            aria-label={state.queue.length > 1 ? 'Clear queue' : 'Remove from queue'}
+            title={state.queue.length > 1 ? 'Clear queue' : 'Remove from queue'}
+            onClick={() => void api.clearQueue()}
+          >
+            <IconClose />
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

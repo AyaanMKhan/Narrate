@@ -18,7 +18,10 @@ export async function send<T = unknown>(message: UiMessage): Promise<T | undefin
 }
 
 export const api = {
-  speak: (text: string, title?: string) => send({ type: 'SPEAK', text, title }),
+  speak: (text: string, title?: string, id?: string) => send({ type: 'SPEAK', text, title, id }),
+  enqueue: (text: string, title?: string, id?: string) => send({ type: 'ENQUEUE', text, title, id }),
+  unqueue: (id: string) => send({ type: 'UNQUEUE', id }),
+  clearQueue: () => send({ type: 'CLEAR_QUEUE' }),
   pause: () => send({ type: 'PAUSE' }),
   resume: () => send({ type: 'RESUME' }),
   stop: () => send({ type: 'STOP' }),
@@ -40,3 +43,8 @@ export const api = {
   getDrivePdf: (id: string) =>
     send<{ name: string; buffer: ArrayBuffer } | null>({ type: 'GET_DRIVE_PDF', id }),
 };
+
+/** Unique enough to tell one narrated text from the next; works on http pages too. */
+export function newItemId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}

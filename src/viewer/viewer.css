@@ -519,6 +519,38 @@ code {
   background: var(--n-accent-hover);
 }
 
+.n-counter--queue {
+  color: var(--n-accent);
+  cursor: pointer;
+}
+
+.n-counter--queue:hover {
+  text-decoration: line-through;
+}
+
+.n-selection-group {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+}
+
+.n-selection-group .n-selection-btn {
+  position: static;
+}
+
+.n-selection-btn--quiet {
+  border-color: var(--n-border);
+  background: var(--n-surface);
+  color: var(--n-text);
+}
+
+.n-selection-btn--quiet:hover {
+  background: var(--n-bg-sunken);
+}
+
 /* ------------------------------------------------------------------ */
 /* Empty / loading / error                                             */
 /* ------------------------------------------------------------------ */

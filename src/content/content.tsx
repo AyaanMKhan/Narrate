@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import tokens from '@/ui/tokens.css?inline';
 import styles from './content.css?inline';
-import { api } from '@/shared/messaging';
+import { api, newItemId } from '@/shared/messaging';
 import { SelectionBubble, type AnchorRect } from './SelectionBubble';
 import { MiniPlayer } from './MiniPlayer';
 import { DrivePdfButton } from './DrivePdfButton';
 import { useNarrateState } from './useNarrateState';
 import * as highlighter from './highlighter';
+import * as queueMarks from './queueMarks';
 import { chunkText } from '@/shared/chunk';
 import type { Chunk } from '@/shared/types';
 
@@ -18,6 +19,12 @@ const MIN_SELECTION_CHARS = 2;
 interface SelectionInfo {
   text: string;
   rect: AnchorRect;
+}
+
+/** What this page needs to highlight a text it sent, whenever it gets read. */
+interface NarratedItem {
+  range: Range | null;
+  chunks: Chunk[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -101,6 +108,8 @@ function ContentApp({ host }: ContentAppProps) {
   const [rateOverride, setRateOverride] = useState<number | null>(null);
   const rangeRef = useRef<Range | null>(null);
   const chunksRef = useRef<Chunk[]>([]);
+  /** Texts this page sent (playing or queued), by item id. */
+  const itemsRef = useRef(new Map<string, NarratedItem>());
 
   const active =
     state.status === 'loading' || state.status === 'playing' || state.status === 'paused';
@@ -237,15 +246,53 @@ function ContentApp({ host }: ContentAppProps) {
     void api.setRate(next);
   }, []);
 
+  /** Remember the selection under a fresh id so it can be highlighted when read. */
+  const registerSelection = useCallback((text: string): string => {
+    const id = newItemId();
+    // Chunk locally with the same splitter the background uses, so the
+    // broadcast chunkIndex maps onto offsets we can resolve in the DOM.
+    itemsRef.current.set(id, { range: rangeRef.current, chunks: chunkText(text) });
+    return id;
+  }, []);
+
   const handlePlay = useCallback(() => {
     if (!selection) return;
     setDismissed(true);
-    // Chunk locally with the same splitter the background uses, so the
-    // broadcast chunkIndex maps onto offsets we can resolve in the DOM.
-    chunksRef.current = chunkText(selection.text);
-    if (rangeRef.current) highlighter.capture(rangeRef.current);
-    void api.speak(selection.text, document.title);
-  }, [selection]);
+    void api.speak(selection.text, document.title, registerSelection(selection.text));
+  }, [selection, registerSelection]);
+
+  const handleQueue = useCallback(() => {
+    if (!selection) return;
+    setDismissed(true);
+    void api.enqueue(selection.text, document.title, registerSelection(selection.text));
+    // Drop the selection so the queued tint shows what was added.
+    try {
+      document.getSelection()?.removeAllRanges();
+    } catch {
+      /* selection API unavailable */
+    }
+  }, [selection, registerSelection]);
+
+  /* Point the highlighter at whichever of our texts is now being read. */
+  useEffect(() => {
+    const item = state.itemId ? itemsRef.current.get(state.itemId) : undefined;
+    highlighter.reset();
+    chunksRef.current = item?.chunks ?? [];
+    if (item?.range) highlighter.capture(item.range);
+  }, [state.itemId]);
+
+  /* Tint queued passages; forget ones that were removed from the queue. */
+  useEffect(() => {
+    const keep = new Set(state.queue.map((q) => q.id));
+    if (state.itemId) keep.add(state.itemId);
+    for (const id of itemsRef.current.keys()) {
+      if (!keep.has(id)) itemsRef.current.delete(id);
+    }
+    const ranges = state.queue
+      .map((q) => itemsRef.current.get(q.id)?.range)
+      .filter((r): r is Range => !!r);
+    queueMarks.show(settings.highlightSpoken ? ranges : []);
+  }, [state.queue, state.itemId, settings.highlightSpoken]);
 
   /* Tint the sentence being spoken, in the page's own DOM. */
   useEffect(() => {
@@ -258,7 +305,7 @@ function ContentApp({ host }: ContentAppProps) {
       highlighter.paint(chunk.start, chunk.end);
       highlighter.ensureVisible();
     }
-  }, [settings.highlightSpoken, state.status, state.chunkIndex]);
+  }, [settings.highlightSpoken, state.status, state.chunkIndex, state.itemId]);
 
   /* Drop the highlight (and its anchors) once narration is over. */
   useEffect(() => {
@@ -268,8 +315,7 @@ function ContentApp({ host }: ContentAppProps) {
     }
   }, [state.status]);
 
-  const showBubble =
-    !!selection && !dismissed && !active && (settings.showBubbleOnSelect || forced);
+  const showBubble = !!selection && !dismissed && (settings.showBubbleOnSelect || forced);
 
   return (
     <>
@@ -279,6 +325,7 @@ function ContentApp({ host }: ContentAppProps) {
           rate={rate}
           onRateChange={handleRate}
           onPlay={handlePlay}
+          onQueue={active ? handleQueue : undefined}
           onDismiss={() => setDismissed(true)}
         />
       ) : null}
